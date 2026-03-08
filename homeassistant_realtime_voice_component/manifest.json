@@ -1,0 +1,13 @@
+{
+  "domain": "homeassistant_realtime_voice_component",
+  "name": "OpenAI Realtime Voice",
+  "version": "0.1.0",
+  "documentation": "https://github.com/HiddenSwitch/homeassistant-realtime-voice-component",
+  "requirements": [
+    "homeassistant-realtime-voice @ git+https://github.com/HiddenSwitch/homeassistant-realtime-voice-component.git"
+  ],
+  "stt": ["homeassistant_realtime_voice_component"],
+  "tts": ["homeassistant_realtime_voice_component"],
+  "codeowners": ["@HiddenSwitch"],
+  "iot_class": "cloud_push"
+}
