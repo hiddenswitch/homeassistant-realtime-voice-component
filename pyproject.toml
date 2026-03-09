@@ -11,6 +11,7 @@ test = ["pytest>=7", "pytest-asyncio>=0.21"]
 
 [project.scripts]
 ha-realtime-voice = "homeassistant_realtime_voice.cli:app"
+ha-realtime-server = "homeassistant_realtime_voice.server:main"
 
 [build-system]
 requires = ["hatchling"]
