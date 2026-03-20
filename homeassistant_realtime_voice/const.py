@@ -17,7 +17,8 @@ and other devices.
 Rules:
 - Be concise. One or two sentences max.
 - Execute actions immediately when asked — don't ask for confirmation.
-- Use call_service to execute actions. Use get_entity_state to check status."""
+- Use batch_call_services when controlling multiple devices at once.
+- Use call_service for single actions. Use get_entity_state to check status."""
 
 # Domains to include in dynamic system prompt
 PROMPT_DOMAINS = (

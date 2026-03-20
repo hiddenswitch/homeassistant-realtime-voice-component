@@ -78,6 +78,43 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "required": ["domain"],
         },
     },
+    {
+        "type": "function",
+        "name": "batch_call_services",
+        "description": "Call multiple Home Assistant services simultaneously. Use this to execute several actions at once, e.g. turn on all lights, set multiple volumes, etc.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "calls": {
+                    "type": "array",
+                    "description": "List of service calls to execute in parallel",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "domain": {
+                                "type": "string",
+                                "description": "Service domain (e.g. switch, light, media_player)",
+                            },
+                            "service": {
+                                "type": "string",
+                                "description": "Service name (e.g. turn_on, turn_off)",
+                            },
+                            "entity_id": {
+                                "type": "string",
+                                "description": "Target entity ID",
+                            },
+                            "data": {
+                                "type": "object",
+                                "description": "Additional service data",
+                            },
+                        },
+                        "required": ["domain", "service"],
+                    },
+                },
+            },
+            "required": ["calls"],
+        },
+    },
 ]
 
 
@@ -174,7 +211,12 @@ async def process_audio_stream(
                         event = json.loads(msg.data)
                         etype = event.get("type", "")
 
-                        _LOGGER.debug("Realtime event: %s", etype)
+                        if etype not in ("response.audio.delta",):
+                            _LOGGER.info("Realtime event: %s %s", etype,
+                                         {k: v for k, v in event.items()
+                                          if k not in ("type", "delta", "audio")}
+                                         if etype in ("response.done", "error", "response.audio_transcript.done")
+                                         else "")
 
                         if etype == "response.audio.delta":
                             audio_parts.append(

@@ -133,19 +133,26 @@ async def _bridge(device_ws: web.WebSocketResponse, request: web.Request) -> Non
                     "output_audio_format": "pcm16",
                     "turn_detection": {
                         "type": "server_vad",
-                        "threshold": 0.5,
+                        "threshold": 0.8,
                         "prefix_padding_ms": 300,
-                        "silence_duration_ms": 500,
+                        "silence_duration_ms": 700,
                     },
                     "tools": list(TOOL_DEFINITIONS),
                 },
             })
 
             # Forward device audio -> OpenAI
+            audio_bytes_received = 0
             async def device_to_openai():
+                nonlocal audio_bytes_received
                 try:
                     async for msg in device_ws:
                         if msg.type == aiohttp.WSMsgType.BINARY:
+                            audio_bytes_received += len(msg.data)
+                            if audio_bytes_received <= len(msg.data):
+                                _LOGGER.info("First audio chunk from device: %d bytes", len(msg.data))
+                            elif audio_bytes_received % 50000 < len(msg.data):
+                                _LOGGER.info("Audio received so far: %d bytes", audio_bytes_received)
                             await openai_ws.send_json({
                                 "type": "input_audio_buffer.append",
                                 "audio": base64.b64encode(msg.data).decode(),
@@ -173,7 +180,10 @@ async def _bridge(device_ws: web.WebSocketResponse, request: web.Request) -> Non
                     _LOGGER.info("Device audio stream ended")
 
             # Forward OpenAI audio -> device
+            audio_bytes_sent = 0
+            response_active = False
             async def openai_to_device():
+                nonlocal audio_bytes_sent, response_active
                 try:
                     async for msg in openai_ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
@@ -182,7 +192,22 @@ async def _bridge(device_ws: web.WebSocketResponse, request: web.Request) -> Non
 
                             if etype == "response.audio.delta":
                                 audio = base64.b64decode(event["delta"])
+                                audio_bytes_sent += len(audio)
+                                response_active = True
+                                if audio_bytes_sent == len(audio):
+                                    _LOGGER.info("First audio delta to device: %d bytes", len(audio))
                                 await device_ws.send_bytes(audio)
+                            elif etype == "input_audio_buffer.speech_started":
+                                if response_active:
+                                    # Ignore speech_started during playback — it's echo
+                                    _LOGGER.debug("Ignoring speech_started during active response (likely echo)")
+                                else:
+                                    _LOGGER.info("OpenAI detected speech start (no active response)")
+                            elif etype == "input_audio_buffer.speech_stopped":
+                                _LOGGER.info("OpenAI detected speech stop")
+                            elif etype == "response.audio.done":
+                                response_active = False
+                                _LOGGER.info("OpenAI audio response complete, sent %d bytes to device", audio_bytes_sent)
                             elif etype == "response.function_call_arguments.done":
                                 await _handle_tool_call(
                                     openai_ws, event, tool_handler
@@ -191,15 +216,6 @@ async def _bridge(device_ws: web.WebSocketResponse, request: web.Request) -> Non
                                 _LOGGER.error("OpenAI error: %s", event.get("error"))
                             elif etype == "session.updated":
                                 _LOGGER.info("OpenAI session configured")
-                            elif etype == "input_audio_buffer.speech_started":
-                                # User started speaking — send interrupt to device
-                                # so it stops playing current response
-                                try:
-                                    await device_ws.send_str(
-                                        json.dumps({"type": "interrupt"})
-                                    )
-                                except Exception:
-                                    pass
                         elif msg.type in (
                             aiohttp.WSMsgType.ERROR,
                             aiohttp.WSMsgType.CLOSED,

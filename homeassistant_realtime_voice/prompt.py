@@ -6,6 +6,7 @@ tested and used from the CLI without a running Home Assistant instance.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from .const import DEFAULT_SYSTEM_PROMPT, PROMPT_DOMAINS, PROMPT_SKIP_PATTERNS
@@ -56,15 +57,29 @@ def build_dynamic_prompt(
         )
 
     state_block = "\n".join(lines) if lines else "  (no devices)"
+    now = datetime.now().strftime("%A, %B %-d, %Y at %-I:%M %p")
     return f"""{base_prompt}
+
+## Current Date and Time
+{now}
 
 ## Current Home State
 {state_block}
 
 ## Available Services
 - switch/turn_on, switch/turn_off
+- light/turn_on, light/turn_off, light/toggle
 - cover/open_cover, cover/close_cover, cover/set_cover_position
 - media_player/media_play, media_player/media_pause, media_player/media_stop
-- media_player/volume_set, media_player/play_media
+- media_player/media_next_track, media_player/media_previous_track
+- media_player/volume_set, media_player/volume_mute
+- media_player/play_media, media_player/select_source
 - media_player/join, media_player/unjoin
-- media_player/repeat_set, media_player/shuffle_set"""
+- media_player/repeat_set, media_player/shuffle_set
+- climate/set_temperature, climate/set_hvac_mode
+- scene/turn_on
+
+## Tips
+- Use batch_call_services to execute multiple actions simultaneously (e.g. turn on all lights).
+- For music, use media_player/play_media with media_content_type and media_content_id.
+- To group Sonos speakers, use media_player/join with group_members in data."""

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Callable, Awaitable
 
 
@@ -46,5 +47,27 @@ async def execute_tool(
             "count": len(entities),
             "entities": entities,
         }
+
+    if name == "batch_call_services":
+        calls = args.get("calls", [])
+        if not calls:
+            return {"error": "No calls provided"}
+
+        async def _do_call(c: dict) -> dict:
+            try:
+                await call_service(
+                    c.get("domain", ""),
+                    c.get("service", ""),
+                    c.get("entity_id"),
+                    c.get("data"),
+                )
+                return {"success": True, "domain": c.get("domain"), "service": c.get("service"),
+                        "entity_id": c.get("entity_id")}
+            except Exception as exc:
+                return {"error": str(exc), "domain": c.get("domain"), "service": c.get("service"),
+                        "entity_id": c.get("entity_id")}
+
+        results = await asyncio.gather(*[_do_call(c) for c in calls])
+        return {"results": list(results), "total": len(results)}
 
     return {"error": f"Unknown tool: {name}"}
