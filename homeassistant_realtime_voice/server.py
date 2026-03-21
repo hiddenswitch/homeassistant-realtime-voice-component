@@ -198,11 +198,12 @@ async def _bridge(device_ws: web.WebSocketResponse, request: web.Request) -> Non
                                     _LOGGER.info("First audio delta to device: %d bytes", len(audio))
                                 await device_ws.send_bytes(audio)
                             elif etype == "input_audio_buffer.speech_started":
-                                if response_active:
-                                    # Ignore speech_started during playback — it's echo
-                                    _LOGGER.debug("Ignoring speech_started during active response (likely echo)")
-                                else:
-                                    _LOGGER.info("OpenAI detected speech start (no active response)")
+                                _LOGGER.info("OpenAI detected speech start (response_active=%s)", response_active)
+                                # With AEC enabled, speech during playback is real user speech (barge-in)
+                                try:
+                                    await device_ws.send_str(json.dumps({"type": "interrupt"}))
+                                except Exception:
+                                    pass
                             elif etype == "input_audio_buffer.speech_stopped":
                                 _LOGGER.info("OpenAI detected speech stop")
                             elif etype == "response.audio.done":
